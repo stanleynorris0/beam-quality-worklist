@@ -818,7 +818,6 @@ table.ref-table td:first-child { color: var(--ink); font-weight: 500; white-spac
   <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2 14.4 13.4H1.6Z"/><path d="M8 6.6v3.1"/><path d="M8 11.7v.1"/></symbol>
   <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3"/><path d="M8 7.3v4"/><path d="M8 4.8v.1"/></symbol>
   <symbol id="i-link" viewBox="0 0 16 16"><path d="M6.6 9.4a2.9 2.9 0 0 0 4.2 0l2-2a2.9 2.9 0 0 0-4.1-4.1l-1 1"/><path d="M9.4 6.6a2.9 2.9 0 0 0-4.2 0l-2 2a2.9 2.9 0 0 0 4.1 4.1l1-1"/></symbol>
-  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="9" rx="1.4"/><path d="M10.6 5.5v-2a1.4 1.4 0 0 0-1.4-1.4H3.9a1.4 1.4 0 0 0-1.4 1.4v5.3a1.4 1.4 0 0 0 1.4 1.4h1.6"/></symbol>
   <symbol id="i-print" viewBox="0 0 16 16"><path d="M4.4 6.2V2.3h7.2v3.9"/><path d="M4.4 11.9H3a1.4 1.4 0 0 1-1.4-1.4V7.6A1.4 1.4 0 0 1 3 6.2h10a1.4 1.4 0 0 1 1.4 1.4v2.9a1.4 1.4 0 0 1-1.4 1.4h-1.4"/><rect x="4.4" y="9.8" width="7.2" height="4.1" rx="1"/></symbol>
   <symbol id="i-theme" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7.1" cy="7.1" r="4.6"/><path d="m10.6 10.6 3.1 3.1"/></symbol>
@@ -844,9 +843,6 @@ table.ref-table td:first-child { color: var(--ink); font-weight: 500; white-spac
     </button>
     <button type="button" class="btn" id="link-btn" title="Copy a link to this selection">
       <svg class="i" aria-hidden="true"><use href="#i-link"/></svg><span class="lbl">Link</span>
-    </button>
-    <button type="button" class="btn" id="copy-btn" title="Copy the worklist as plain text">
-      <svg class="i" aria-hidden="true"><use href="#i-copy"/></svg><span class="lbl">Copy</span>
     </button>
     <button type="button" class="btn btn-primary" id="print-btn" title="Print or save the worklist as PDF">
       <svg class="i" aria-hidden="true"><use href="#i-print"/></svg><span class="lbl">Print</span>
@@ -1638,69 +1634,6 @@ window.BQG_DATA = JSON.parse(document.getElementById("bqg-data").textContent);
     "</div>";
   }
 
-  /* --------------------------------------------------------- plain text out */
-
-  function worklistText() {
-    var tasks = selectedTasks();
-    var m = metrics(tasks);
-    var L = [];
-    L.push("BEAM QUALITY WORKLIST");
-    L.push(DATA.meta.documentNumber + " rev " + DATA.meta.revision + " — " + DATA.meta.productsAffected);
-    L.push("Generated " + new Date().toISOString().slice(0, 16).replace("T", " ") +
-           " — prototype aid, not a Varian product. Verify against the source document.");
-    L.push("");
-    L.push(plural(tasks.length, "task", "tasks") + ", " + plural(m.total, "test entry", "test entries") +
-           " (" + m.mp + " physics/QA, " + m.eng + " engineer" + (m.other ? ", " + m.other + " unspecified" : "") + ")");
-    L.push("");
-
-    if (state.view === "combined") {
-      var built = buildCombined(tasks);
-      L.push("COMBINED WORKLIST (derived sequence — per-task order is authoritative)");
-      if (built.conflicts.length) L.push("!! Sequence conflict: " + built.conflicts.join(", "));
-      built.items.forEach(function (n, i) {
-        L.push("  " + pad(i + 1) + ". [ ] " + n.key + "  (" + n.roles.map(function (r) {
-          return ROLE_SHORT[r]; }).join("/") + ")  required by " + n.taskIds.join(", ") +
-          (n.noteRefs.length ? "  " + n.noteRefs.join("; ") : ""));
-      });
-    } else {
-      tasks.forEach(function (task) {
-        L.push("=".repeat(72));
-        L.push(task.id + "  " + task.name);
-        L.push("Table " + task.table + " · PDF p." + task.page + (task.pageInferred ? " (inferred)" : ""));
-        L.push("-".repeat(72));
-        task.tests.forEach(function (t) {
-          L.push("  " + pad(t.seq) + ". [" + (isTicked(task.id, t.seq) ? "x" : " ") + "] " + t.text +
-                 "  (" + ROLE_SHORT[t.role || "none"] + ")" +
-                 (t.noteRefs.length ? "  " + t.noteRefs.join("; ") : ""));
-        });
-        if (task.caution) {
-          L.push("");
-          L.push("  CAUTION:");
-          task.caution.split("\n").forEach(function (l) { L.push("    " + l); });
-        }
-        var refs = task.noteRefs.filter(function (r) { return r !== "CAUTION NOTE"; });
-        refs.forEach(function (r) {
-          var n = NOTE_BY_ID[r];
-          if (!n) return;
-          L.push("");
-          L.push("  " + n.id + " (PDF p." + n.page + "): " + n.summary);
-          if (n.reason) L.push("    Reason: " + n.reason);
-          if (n.condition) n.condition.split("\n").forEach(function (l, i) {
-            L.push("    " + (i === 0 ? "When: " : "      ") + l);
-          });
-          if (n.detail) n.detail.split("\n").forEach(function (l, i) {
-            L.push("    " + (i === 0 ? "Detail: " : "      ") + l);
-          });
-        });
-        L.push("");
-      });
-    }
-    L.push("Sign-off  Machine/serial: ______________  Date: __________");
-    L.push("          Engineer: ______________________  Physicist: ______________________");
-    return L.join("\n");
-  }
-  function pad(n) { return (n < 10 ? " " : "") + n; }
-
   /* ----------------------------------------------------------- drawers */
 
   var lastFocus = null;
@@ -2009,25 +1942,6 @@ window.BQG_DATA = JSON.parse(document.getElementById("bqg-data").textContent);
       window.print();
     });
 
-    $("#copy-btn").addEventListener("click", function () {
-      if (!state.selected.length) { toast("Select at least one task first"); return; }
-      var text = worklistText();
-      function fallback() {
-        var ta = document.createElement("textarea");
-        ta.value = text; ta.setAttribute("readonly", "");
-        ta.style.cssText = "position:fixed;left:-9999px";
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand("copy"); toast("Worklist copied as text"); }
-        catch (err) { toast("Copy failed — use Print instead"); }
-        document.body.removeChild(ta);
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function () {
-          toast("Worklist copied as text");
-        }, fallback);
-      } else fallback();
-    });
-
     $("#link-btn").addEventListener("click", function () {
       if (!state.selected.length) { toast("Select at least one task first"); return; }
       var url = window.location.href;
@@ -2092,7 +2006,7 @@ window.BQG_DATA = JSON.parse(document.getElementById("bqg-data").textContent);
   if (typeof window.BQG_TEST_HOOK === "function") {
     window.BQG_TEST_HOOK({
       state: state, TASKS: TASKS, TASK_BY_ID: TASK_BY_ID, NOTE_BY_ID: NOTE_BY_ID,
-      buildCombined: buildCombined, metrics: metrics, worklistText: worklistText,
+      buildCombined: buildCombined, metrics: metrics,
       renderByTask: renderByTask, renderCombined: renderCombined, renderPicker: renderPicker,
       renderWork: renderWork, toggleTask: toggleTask, setView: setView,
       setTick: setTick, isTicked: isTicked, selectedTasks: selectedTasks,
