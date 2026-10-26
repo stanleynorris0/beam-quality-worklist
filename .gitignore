@@ -1,0 +1,9 @@
+# This repo is deliberately minimal: only the self-contained dashboard is
+# published. Everything else in this working directory (source extraction,
+# build tooling, docs, the PDF, the workbook) stays local and is never
+# tracked or pushed, enforced by ignoring everything except the files
+# explicitly un-ignored below.
+*
+!index.html
+!.nojekyll
+!.gitignore
